@@ -1,0 +1,118 @@
+import { useState } from 'react';
+import { Button, EmptyState, GroupSection, IconButton, InboxIcon, SettingsIcon, SmallButton, Toast, VaultIcon } from '../components';
+import { DEFAULT_GROUP_ID } from '../domain';
+import { useTabVaultPopup } from './useTabVaultPopup';
+
+export default function Popup() {
+  const {
+    savedTabs,
+    groups,
+    isLoaded,
+    busy,
+    isBusy,
+    notification,
+    handleSaveCurrentTab,
+    handleSaveAllTabs,
+    handleOpenTab,
+    handleDeleteTab,
+    handleOpenAllTabs,
+    handleCreateGroup,
+    handleRenameGroup,
+    handleDeleteGroup,
+    handleOpenGroupTabs,
+  } = useTabVaultPopup();
+
+  const [newGroupName, setNewGroupName] = useState('');
+  const hasAnyContent = savedTabs.length > 0 || groups.length > 1;
+
+  const submitNewGroup = () => {
+    const trimmed = newGroupName.trim();
+    if (!trimmed) return;
+    handleCreateGroup(trimmed);
+    setNewGroupName('');
+  };
+
+  return (
+    <div className="flex w-80 flex-col bg-white text-slate-900">
+      <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <VaultIcon className="size-5 text-slate-900" />
+          <span className="text-sm font-semibold tracking-tight">TabVault</span>
+        </div>
+        <IconButton label="Settings" disabled>
+          <SettingsIcon className="size-4" />
+        </IconButton>
+      </header>
+
+      <main className="flex flex-col gap-3 px-4 py-4">
+        {notification && <Toast message={notification.message} variant={notification.type} />}
+
+        <Button onClick={handleSaveCurrentTab} disabled={isBusy}>
+          {busy.type === 'saving-current' ? 'Saving…' : 'Save Current Tab'}
+        </Button>
+        <Button variant="secondary" onClick={handleSaveAllTabs} disabled={isBusy}>
+          {busy.type === 'saving-all' ? 'Saving…' : 'Save All Tabs'}
+        </Button>
+
+        <div className="flex flex-col gap-3 border-t border-slate-100 pt-3">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              submitNewGroup();
+            }}
+            className="flex gap-1.5"
+          >
+            <input
+              value={newGroupName}
+              onChange={(event) => setNewGroupName(event.target.value)}
+              placeholder="New group name"
+              disabled={isBusy}
+              className="min-w-0 flex-1 rounded-md border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <SmallButton type="submit" disabled={isBusy || !newGroupName.trim()}>
+              {busy.type === 'creating-group' ? 'Adding…' : 'Add group'}
+            </SmallButton>
+          </form>
+
+          {!isLoaded ? null : !hasAnyContent ? (
+            <EmptyState
+              icon={<InboxIcon className="size-6" />}
+              title="No saved tabs yet"
+              description="Tabs you save will show up here, organized and ready to restore."
+            />
+          ) : (
+            <>
+              <Button variant="secondary" onClick={handleOpenAllTabs} disabled={isBusy}>
+                {busy.type === 'opening-all' ? 'Opening…' : 'Open All'}
+              </Button>
+              <div className="flex max-h-72 flex-col gap-3 overflow-y-auto">
+                {groups.map((group) => (
+                  <GroupSection
+                    key={group.id}
+                    group={group}
+                    tabs={savedTabs.filter((tab) => tab.groupId === group.id)}
+                    isDefault={group.id === DEFAULT_GROUP_ID}
+                    disabled={isBusy}
+                    isOpeningAll={busy.type === 'opening-group' && busy.groupId === group.id}
+                    isDeletingGroup={busy.type === 'deleting-group' && busy.groupId === group.id}
+                    openingTabId={busy.type === 'opening' ? busy.tabId : null}
+                    deletingTabId={busy.type === 'deleting' ? busy.tabId : null}
+                    onRename={(name) => handleRenameGroup(group, name)}
+                    onDelete={() => handleDeleteGroup(group)}
+                    onOpenAll={() => handleOpenGroupTabs(group)}
+                    onOpenTab={handleOpenTab}
+                    onDeleteTab={handleDeleteTab}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </main>
+
+      <footer className="border-t border-slate-100 px-4 py-2.5 text-xs text-slate-400">
+        {savedTabs.length} tab{savedTabs.length === 1 ? '' : 's'} saved
+      </footer>
+    </div>
+  );
+}
