@@ -39,15 +39,6 @@ export async function saveSavedTabs(tabs: SavedTab[]): Promise<void> {
   }
 }
 
-/** Removes all saved tabs from storage. */
-export async function clearSavedTabs(): Promise<void> {
-  try {
-    await chrome.storage.local.remove(STORAGE_KEYS.tabs);
-  } catch (error) {
-    throw new StorageError('clearSavedTabs', error);
-  }
-}
-
 /** Removes a single saved tab by id, e.g. once it has been successfully reopened. */
 export async function removeSavedTab(id: string): Promise<void> {
   try {
