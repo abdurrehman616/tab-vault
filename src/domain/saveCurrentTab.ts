@@ -1,6 +1,7 @@
 import { closeTab, getCurrentTab } from '../services/chrome';
 import { DEFAULT_GROUP_ID, getSavedTabs, saveSavedTabs } from '../services/storage';
-import type { BrowserTab, SavedTab } from '../types';
+import type { BrowserTab, ChromeTabGroupInfo, SavedTab } from '../types';
+import { captureChromeGroupsForTabs } from './captureChromeGroups';
 
 export type SaveCurrentTabResult =
   | { status: 'saved'; tab: SavedTab; totalSaved: number }
@@ -8,7 +9,7 @@ export type SaveCurrentTabResult =
   | { status: 'not-savable' }
   | { status: 'error'; message: string };
 
-function toSavedTab(browserTab: BrowserTab): SavedTab {
+function toSavedTab(browserTab: BrowserTab, chromeGroupInfoByChromeId: Map<number, ChromeTabGroupInfo>): SavedTab {
   return {
     id: crypto.randomUUID(),
     url: browserTab.url,
@@ -19,6 +20,7 @@ function toSavedTab(browserTab: BrowserTab): SavedTab {
     savedAt: Date.now(),
     groupId: DEFAULT_GROUP_ID,
     isFavorite: false,
+    chromeGroupKey: chromeGroupInfoByChromeId.get(browserTab.chromeGroupId)?.id,
   };
 }
 
@@ -52,7 +54,8 @@ export async function saveCurrentTab(): Promise<SaveCurrentTabResult> {
     return { status: 'duplicate' };
   }
 
-  const savedTab = toSavedTab(browserTab);
+  const chromeGroupInfoByChromeId = await captureChromeGroupsForTabs([browserTab]);
+  const savedTab = toSavedTab(browserTab, chromeGroupInfoByChromeId);
   const updated = [...existing, savedTab];
 
   try {

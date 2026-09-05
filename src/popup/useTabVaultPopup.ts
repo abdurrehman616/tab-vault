@@ -44,6 +44,39 @@ function pluralTabs(count: number): string {
   return count === 1 ? 'tab' : 'tabs';
 }
 
+function pluralGroups(count: number): string {
+  return count === 1 ? 'group' : 'groups';
+}
+
+/**
+ * Builds the notification for any "opened N tabs" outcome, folding in
+ * Chrome Tab Group recreation results (see `openTabsInOrder`/
+ * `recreateChromeGroups`) alongside the existing open/fail counts.
+ */
+function buildOpenNotification(result: {
+  openedCount: number;
+  failedCount: number;
+  groupsRecreatedCount: number;
+  groupsFailedCount: number;
+}): Notification {
+  const parts = [
+    result.failedCount > 0
+      ? `${result.openedCount} ${pluralTabs(result.openedCount)} opened — ${result.failedCount} couldn't open`
+      : `${result.openedCount} ${pluralTabs(result.openedCount)} opened`,
+  ];
+  if (result.groupsRecreatedCount > 0) {
+    parts.push(`${result.groupsRecreatedCount} ${pluralGroups(result.groupsRecreatedCount)} restored`);
+  }
+  if (result.groupsFailedCount > 0) {
+    parts.push(`${result.groupsFailedCount} ${pluralGroups(result.groupsFailedCount)} couldn't be restored`);
+  }
+
+  return {
+    type: result.failedCount > 0 || result.groupsFailedCount > 0 ? 'error' : 'success',
+    message: parts.join(' · '),
+  };
+}
+
 export function useTabVaultPopup() {
   const [savedTabs, setSavedTabs] = useState<SavedTab[]>([]);
   const [groups, setGroups] = useState<TabGroup[]>([]);
@@ -224,15 +257,10 @@ export function useTabVaultPopup() {
     runExclusive({ type: 'opening-all' }, async () => {
       const result = await openAllSavedTabs();
       switch (result.status) {
-        case 'opened': {
+        case 'opened':
           await refreshTabs();
-          const message =
-            result.failedCount > 0
-              ? `${result.openedCount} ${pluralTabs(result.openedCount)} opened — ${result.failedCount} couldn't open`
-              : `${result.openedCount} ${pluralTabs(result.openedCount)} opened`;
-          setNotification({ type: result.failedCount > 0 ? 'error' : 'success', message });
+          setNotification(buildOpenNotification(result));
           break;
-        }
         case 'nothing-to-open':
           setNotification({ type: 'info', message: 'No saved tabs to open.' });
           break;
@@ -301,15 +329,10 @@ export function useTabVaultPopup() {
     runExclusive({ type: 'opening-group', groupId: group.id }, async () => {
       const result = await openGroupTabs(group.id);
       switch (result.status) {
-        case 'opened': {
+        case 'opened':
           await refreshTabs();
-          const message =
-            result.failedCount > 0
-              ? `${result.openedCount} ${pluralTabs(result.openedCount)} opened — ${result.failedCount} couldn't open`
-              : `${result.openedCount} ${pluralTabs(result.openedCount)} opened`;
-          setNotification({ type: result.failedCount > 0 ? 'error' : 'success', message });
+          setNotification(buildOpenNotification(result));
           break;
-        }
         case 'nothing-to-open':
           setNotification({ type: 'info', message: 'No tabs in this group.' });
           break;

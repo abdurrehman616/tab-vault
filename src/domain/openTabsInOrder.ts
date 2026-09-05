@@ -1,8 +1,14 @@
 import { openTab } from '../services/chrome';
 import { removeSavedTab } from '../services/storage';
 import type { SavedTab } from '../types';
+import { recreateChromeGroups } from './recreateChromeGroups';
 
-export type OpenTabsOutcome = { openedCount: number; failedCount: number };
+export type OpenTabsOutcome = {
+  openedCount: number;
+  failedCount: number;
+  groupsRecreatedCount: number;
+  groupsFailedCount: number;
+};
 
 /**
  * Opens the given saved tabs one at a time, in order. Each tab is removed
@@ -12,21 +18,28 @@ export type OpenTabsOutcome = { openedCount: number; failedCount: number };
  * tabs already opened are correctly cleared from storage and only the
  * not-yet-opened tabs remain saved. A tab that fails to open is left in
  * storage and does not stop the rest from being processed.
+ *
+ * Once every tab has been opened (or failed), any Chrome Tab Groups they
+ * originally belonged to are recreated as a separate, best-effort step —
+ * see `recreateChromeGroups`. That step runs after, and independently of,
+ * the tab restoration above: a tab is never left unrestored or unsaved
+ * because of a group-recreation failure.
  */
 export async function openTabsInOrder(tabs: SavedTab[]): Promise<OpenTabsOutcome> {
-  let openedCount = 0;
+  const opened: { tab: SavedTab; chromeTabId: number }[] = [];
   let failedCount = 0;
 
   for (const tab of tabs) {
+    let chromeTabId: number;
     try {
-      await openTab(tab.url);
+      chromeTabId = await openTab(tab.url);
     } catch {
       console.error('TabVault: failed to open saved tab', tab.id);
       failedCount += 1;
       continue;
     }
 
-    openedCount += 1;
+    opened.push({ tab, chromeTabId });
     try {
       await removeSavedTab(tab.id);
     } catch {
@@ -36,5 +49,8 @@ export async function openTabsInOrder(tabs: SavedTab[]): Promise<OpenTabsOutcome
     }
   }
 
-  return { openedCount, failedCount };
+  const { recreatedCount: groupsRecreatedCount, failedCount: groupsFailedCount } =
+    await recreateChromeGroups(opened);
+
+  return { openedCount: opened.length, failedCount, groupsRecreatedCount, groupsFailedCount };
 }

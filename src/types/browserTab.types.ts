@@ -11,4 +11,6 @@ export interface BrowserTab {
   faviconUrl?: string;
   active: boolean;
   pinned: boolean;
+  /** The Chrome Tab Group this tab belongs to, or -1 (`chrome.tabGroups.TAB_GROUP_ID_NONE`) if ungrouped. Ephemeral — only meaningful within the current browser session. */
+  chromeGroupId: number;
 }

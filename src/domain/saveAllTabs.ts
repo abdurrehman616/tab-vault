@@ -1,6 +1,7 @@
 import { closeTab, getCurrentWindowTabs } from '../services/chrome';
 import { DEFAULT_GROUP_ID, getSavedTabs, saveSavedTabs } from '../services/storage';
-import type { BrowserTab, SavedTab } from '../types';
+import type { BrowserTab, ChromeTabGroupInfo, SavedTab } from '../types';
+import { captureChromeGroupsForTabs } from './captureChromeGroups';
 
 export type SaveAllTabsResult =
   | {
@@ -13,7 +14,7 @@ export type SaveAllTabsResult =
   | { status: 'nothing-to-save' }
   | { status: 'error'; message: string };
 
-function toSavedTab(browserTab: BrowserTab): SavedTab {
+function toSavedTab(browserTab: BrowserTab, chromeGroupInfoByChromeId: Map<number, ChromeTabGroupInfo>): SavedTab {
   return {
     id: crypto.randomUUID(),
     url: browserTab.url,
@@ -24,6 +25,7 @@ function toSavedTab(browserTab: BrowserTab): SavedTab {
     savedAt: Date.now(),
     groupId: DEFAULT_GROUP_ID,
     isFavorite: false,
+    chromeGroupKey: chromeGroupInfoByChromeId.get(browserTab.chromeGroupId)?.id,
   };
 }
 
@@ -69,7 +71,8 @@ export async function saveAllTabs(): Promise<SaveAllTabsResult> {
     return { status: 'nothing-to-save' };
   }
 
-  const newSavedTabs = tabsToSave.map(toSavedTab);
+  const chromeGroupInfoByChromeId = await captureChromeGroupsForTabs(tabsToSave);
+  const newSavedTabs = tabsToSave.map((tab) => toSavedTab(tab, chromeGroupInfoByChromeId));
   const updated = [...existing, ...newSavedTabs];
 
   try {

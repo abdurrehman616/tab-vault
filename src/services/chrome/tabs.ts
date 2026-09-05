@@ -45,6 +45,7 @@ function toBrowserTab(tab: chrome.tabs.Tab): BrowserTab | null {
     faviconUrl: tab.favIconUrl,
     active: tab.active,
     pinned: tab.pinned,
+    chromeGroupId: tab.groupId ?? -1,
   };
 }
 
@@ -90,7 +91,9 @@ export async function closeTab(tabId: number): Promise<void> {
 }
 
 /**
- * Opens the given URL in a new, background (inactive) Chrome tab.
+ * Opens the given URL in a new, background (inactive) Chrome tab. Returns
+ * the newly created tab's id, e.g. so callers can later group it with
+ * other freshly-opened tabs.
  *
  * Deliberately not `active`: activating a newly created tab shifts window
  * focus away from the extension popup, which Chrome then closes immediately
@@ -98,10 +101,16 @@ export async function closeTab(tabId: number): Promise<void> {
  * keeps the popup alive so callers can finish their own bookkeeping (e.g.
  * removing the tab from storage) after this resolves.
  */
-export async function openTab(url: string): Promise<void> {
+export async function openTab(url: string): Promise<number> {
+  let tab: chrome.tabs.Tab;
   try {
-    await chrome.tabs.create({ url, active: false });
+    tab = await chrome.tabs.create({ url, active: false });
   } catch (error) {
     throw new ChromeApiError('openTab', error);
   }
+
+  if (tab.id === undefined) {
+    throw new ChromeApiError('openTab', new Error('Created tab has no id'));
+  }
+  return tab.id;
 }
