@@ -1,6 +1,6 @@
 export { saveCurrentTab } from './saveCurrentTab';
 export type { SaveCurrentTabResult } from './saveCurrentTab';
-export { saveAllTabs } from './saveAllTabs';
+export { saveAllTabs, saveAllWindowsTabs } from './saveAllTabs';
 export type { SaveAllTabsResult } from './saveAllTabs';
 export { openSavedTab } from './openSavedTab';
 export type { OpenSavedTabResult } from './openSavedTab';

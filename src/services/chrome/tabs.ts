@@ -81,6 +81,25 @@ export async function getCurrentWindowTabs(): Promise<BrowserTab[]> {
     .filter((tab): tab is BrowserTab => tab !== null);
 }
 
+/**
+ * Returns all savable tabs across every open Chrome window, ordered by
+ * window then by on-screen position within that window. Each tab's
+ * `windowId` distinguishes which window it came from.
+ */
+export async function getAllWindowTabs(): Promise<BrowserTab[]> {
+  let tabs: chrome.tabs.Tab[];
+  try {
+    tabs = await chrome.tabs.query({});
+  } catch (error) {
+    throw new ChromeApiError('getAllWindowTabs', error);
+  }
+
+  return tabs
+    .map(toBrowserTab)
+    .filter((tab): tab is BrowserTab => tab !== null)
+    .sort((a, b) => (a.windowId === b.windowId ? a.index - b.index : a.windowId - b.windowId));
+}
+
 /** Closes the given Chrome tab. */
 export async function closeTab(tabId: number): Promise<void> {
   try {

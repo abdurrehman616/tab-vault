@@ -26,6 +26,7 @@ export default function Popup() {
     notification,
     handleSaveCurrentTab,
     handleSaveAllTabs,
+    handleSaveAllWindowsTabs,
     handleOpenTab,
     handleDeleteTab,
     handleToggleFavorite,
@@ -112,6 +113,9 @@ export default function Popup() {
         <Button variant="secondary" onClick={handleSaveAllTabs} disabled={isBusy}>
           {busy.type === 'saving-all' ? 'Saving…' : 'Save All Tabs'}
         </Button>
+        <SmallButton onClick={handleSaveAllWindowsTabs} disabled={isBusy} className="self-end">
+          {busy.type === 'saving-all-windows' ? 'Saving…' : 'Save tabs from all windows'}
+        </SmallButton>
 
         <div className="flex flex-col gap-3 border-t border-slate-100 pt-3">
           <form
