@@ -74,8 +74,8 @@ export default function Popup() {
   };
 
   return (
-    <div className="flex w-80 flex-col bg-white text-slate-900">
-      <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+    <div className="flex max-h-[600px] w-80 flex-col overflow-hidden bg-white text-slate-900">
+      <header className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
         <div className="flex items-center gap-2">
           <VaultIcon className="size-5 text-slate-900" />
           <span className="text-sm font-semibold tracking-tight">TabVault</span>
@@ -85,7 +85,7 @@ export default function Popup() {
         </IconButton>
       </header>
 
-      <main className="flex flex-col gap-3 px-4 py-4">
+      <main className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
         {notification && <Toast message={notification.message} variant={notification.type} />}
 
         <Button onClick={handleSaveCurrentTab} disabled={isBusy}>
@@ -142,7 +142,7 @@ export default function Popup() {
                   <Button variant="secondary" onClick={handleOpenAllTabs} disabled={isBusy}>
                     {busy.type === 'opening-all' ? 'Opening…' : 'Open All'}
                   </Button>
-                  <div className="flex max-h-72 flex-col gap-3 overflow-y-auto">
+                  <div className="flex flex-col gap-3">
                     {groupsToShow.map((group) => (
                       <GroupSection
                         key={group.id}
@@ -170,7 +170,7 @@ export default function Popup() {
         </div>
       </main>
 
-      <footer className="border-t border-slate-100 px-4 py-2.5 text-xs text-slate-400">
+      <footer className="shrink-0 border-t border-slate-100 px-4 py-2.5 text-xs text-slate-400">
         {savedTabs.length} tab{savedTabs.length === 1 ? '' : 's'} saved
       </footer>
     </div>
