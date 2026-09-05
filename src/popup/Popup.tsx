@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   EmptyState,
@@ -6,6 +6,7 @@ import {
   IconButton,
   InboxIcon,
   SearchIcon,
+  SearchInput,
   SettingsIcon,
   SmallButton,
   Toast,
@@ -35,10 +36,32 @@ export default function Popup() {
 
   const [newGroupName, setNewGroupName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const hasAnyContent = savedTabs.length > 0 || groups.length > 1;
+
+  // Pressing "/" focuses search, unless the user is already typing
+  // somewhere else (another input, the group-name field, an in-progress
+  // group rename) — a common, low-risk convention (GitHub, Slack, etc.)
+  // that doesn't interfere with typing "/" as part of a URL or a name.
+  useEffect(() => {
+    function handleGlobalKeyDown(event: KeyboardEvent) {
+      if (event.key !== '/') return;
+      const target = event.target as HTMLElement | null;
+      const isTypingElsewhere =
+        target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;
+      if (isTypingElsewhere || !searchInputRef.current) return;
+      event.preventDefault();
+      searchInputRef.current.focus();
+    }
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    return () => document.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   const isSearching = normalizeSearchQuery(searchQuery).length > 0;
   const filteredSavedTabs = useMemo(() => searchSavedTabs(savedTabs, searchQuery), [savedTabs, searchQuery]);
+  // Reuses the same normalized terms searchSavedTabs matched against, so
+  // what's highlighted in each row always matches why it's shown.
+  const searchTerms = isSearching ? normalizeSearchQuery(searchQuery).split(' ') : [];
   const groupsToShow = isSearching
     ? groups.filter((group) => filteredSavedTabs.some((tab) => tab.groupId === group.id))
     : groups;
@@ -100,17 +123,7 @@ export default function Popup() {
             />
           ) : (
             <>
-              <label className="relative flex items-center">
-                <span className="sr-only">Search saved tabs</span>
-                <SearchIcon className="pointer-events-none absolute left-2 size-4 text-slate-400" />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search saved tabs..."
-                  className="w-full rounded-md border border-slate-200 py-1.5 pr-3 pl-8 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                />
-              </label>
+              <SearchInput ref={searchInputRef} value={searchQuery} onChange={setSearchQuery} />
 
               {isSearching && (
                 <p className="px-1 text-xs text-slate-400">
@@ -122,7 +135,7 @@ export default function Popup() {
                 <EmptyState
                   icon={<SearchIcon className="size-6" />}
                   title="No matching tabs"
-                  description="Try a different search term."
+                  description="Try a different title, URL, or domain."
                 />
               ) : (
                 <>
@@ -146,6 +159,7 @@ export default function Popup() {
                         onOpenAll={() => handleOpenGroupTabs(group)}
                         onOpenTab={handleOpenTab}
                         onDeleteTab={handleDeleteTab}
+                        searchTerms={searchTerms}
                       />
                     ))}
                   </div>

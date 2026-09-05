@@ -19,6 +19,7 @@ type GroupSectionProps = {
   onOpenAll: () => void;
   onOpenTab: (tab: SavedTab) => void;
   onDeleteTab: (tab: SavedTab) => void;
+  searchTerms: string[];
 };
 
 export function GroupSection({
@@ -35,6 +36,7 @@ export function GroupSection({
   onOpenAll,
   onOpenTab,
   onDeleteTab,
+  searchTerms,
 }: GroupSectionProps) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftName, setDraftName] = useState(group.name);
@@ -121,6 +123,7 @@ export function GroupSection({
               disabled={disabled}
               isOpening={openingTabId === tab.id}
               isDeleting={deletingTabId === tab.id}
+              searchTerms={searchTerms}
             />
           ))}
         </ul>

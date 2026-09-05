@@ -1,4 +1,5 @@
 import type { SavedTab } from '../types';
+import { HighlightedText } from './HighlightedText';
 import { IconButton } from './IconButton';
 import { SmallButton } from './SmallButton';
 import { TrashIcon, VaultIcon } from './icons';
@@ -10,9 +11,10 @@ type SavedTabRowProps = {
   disabled: boolean;
   isOpening: boolean;
   isDeleting: boolean;
+  searchTerms: string[];
 };
 
-export function SavedTabRow({ tab, onOpen, onDelete, disabled, isOpening, isDeleting }: SavedTabRowProps) {
+export function SavedTabRow({ tab, onOpen, onDelete, disabled, isOpening, isDeleting, searchTerms }: SavedTabRowProps) {
   return (
     <li className="flex items-center gap-2 rounded-md px-1.5 py-1.5 hover:bg-slate-50">
       {tab.faviconUrl ? (
@@ -21,8 +23,12 @@ export function SavedTabRow({ tab, onOpen, onDelete, disabled, isOpening, isDele
         <VaultIcon className="size-4 shrink-0 text-slate-300" />
       )}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm text-slate-800">{tab.title}</p>
-        <p className="truncate text-xs text-slate-400">{tab.url}</p>
+        <p className="truncate text-sm text-slate-800">
+          <HighlightedText text={tab.title} terms={searchTerms} />
+        </p>
+        <p className="truncate text-xs text-slate-400">
+          <HighlightedText text={tab.url} terms={searchTerms} />
+        </p>
       </div>
       <SmallButton onClick={onOpen} disabled={disabled}>
         {isOpening ? 'Opening…' : 'Open'}
