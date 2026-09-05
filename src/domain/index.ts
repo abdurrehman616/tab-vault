@@ -19,4 +19,5 @@ export { renameGroup } from './renameGroup';
 export type { RenameGroupResult } from './renameGroup';
 export { deleteGroup } from './deleteGroup';
 export type { DeleteGroupResult } from './deleteGroup';
+export { computeReorderedSavedTabs, isSameSavedTabsOrder, persistSavedTabsOrder, MOVE_TO_END } from './reorderSavedTabs';
 export { DEFAULT_GROUP_ID } from '../services/storage';

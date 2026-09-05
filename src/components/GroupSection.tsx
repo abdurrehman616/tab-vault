@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import type { DragEvent } from 'react';
+import { MOVE_TO_END } from '../domain';
 import type { SavedTab, TabGroup } from '../types';
 import { IconButton } from './IconButton';
 import { SavedTabRow } from './SavedTabRow';
@@ -8,8 +10,10 @@ import { TrashIcon } from './icons';
 type GroupSectionProps = {
   group: TabGroup;
   tabs: SavedTab[];
+  allGroups: TabGroup[];
   isDefault: boolean;
   disabled: boolean;
+  reorderingDisabled: boolean;
   isOpeningAll: boolean;
   isDeletingGroup: boolean;
   openingTabId: string | null;
@@ -19,14 +23,17 @@ type GroupSectionProps = {
   onOpenAll: () => void;
   onOpenTab: (tab: SavedTab) => void;
   onDeleteTab: (tab: SavedTab) => void;
+  onMoveTab: (tabId: string, targetGroupId: string, targetIndexInGroup: number) => void;
   searchTerms: string[];
 };
 
 export function GroupSection({
   group,
   tabs,
+  allGroups,
   isDefault,
   disabled,
+  reorderingDisabled,
   isOpeningAll,
   isDeletingGroup,
   openingTabId,
@@ -36,10 +43,13 @@ export function GroupSection({
   onOpenAll,
   onOpenTab,
   onDeleteTab,
+  onMoveTab,
   searchTerms,
 }: GroupSectionProps) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftName, setDraftName] = useState(group.name);
+  const [isContainerDragOver, setIsContainerDragOver] = useState(false);
+  const dragDisabled = disabled || reorderingDisabled;
 
   const startEditing = () => {
     setDraftName(group.name);
@@ -64,6 +74,23 @@ export function GroupSection({
   const cancelEditing = () => {
     setDraftName(group.name);
     setIsEditingName(false);
+  };
+
+  // A drop that lands on empty space (an empty group, or below the last
+  // row) means "append to the end of this group". Rows call
+  // stopPropagation() on their own drop handler, so this only ever fires
+  // when the drop didn't land precisely on a row.
+  const handleContainerDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsContainerDragOver(false);
+    const draggedTabId = event.dataTransfer.getData('text/plain');
+    if (!draggedTabId) return;
+    onMoveTab(draggedTabId, group.id, MOVE_TO_END);
+  };
+
+  const handleContainerDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
   };
 
   return (
@@ -110,24 +137,40 @@ export function GroupSection({
         </div>
       </div>
 
-      {tabs.length === 0 ? (
-        <p className="px-1 text-xs text-slate-300">No tabs in this group.</p>
-      ) : (
-        <ul className="flex flex-col gap-0.5">
-          {tabs.map((tab) => (
-            <SavedTabRow
-              key={tab.id}
-              tab={tab}
-              onOpen={() => onOpenTab(tab)}
-              onDelete={() => onDeleteTab(tab)}
-              disabled={disabled}
-              isOpening={openingTabId === tab.id}
-              isDeleting={deletingTabId === tab.id}
-              searchTerms={searchTerms}
-            />
-          ))}
-        </ul>
-      )}
+      <div
+        onDragOver={dragDisabled ? undefined : handleContainerDragOver}
+        onDragEnter={dragDisabled ? undefined : () => setIsContainerDragOver(true)}
+        onDragLeave={dragDisabled ? undefined : () => setIsContainerDragOver(false)}
+        onDrop={dragDisabled ? undefined : handleContainerDrop}
+        className={`rounded-md ${isContainerDragOver ? 'bg-slate-50 ring-1 ring-inset ring-slate-300' : ''}`}
+      >
+        {tabs.length === 0 ? (
+          <p className="px-1 py-1 text-xs text-slate-300">
+            {dragDisabled ? 'No tabs in this group.' : 'No tabs in this group. Drop a tab here to move it in.'}
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-0.5">
+            {tabs.map((tab, index) => (
+              <SavedTabRow
+                key={tab.id}
+                tab={tab}
+                onOpen={() => onOpenTab(tab)}
+                onDelete={() => onDeleteTab(tab)}
+                disabled={disabled}
+                isOpening={openingTabId === tab.id}
+                isDeleting={deletingTabId === tab.id}
+                searchTerms={searchTerms}
+                localIndex={index}
+                isFirstInGroup={index === 0}
+                isLastInGroup={index === tabs.length - 1}
+                allGroups={allGroups}
+                reorderingDisabled={reorderingDisabled}
+                onMoveTab={onMoveTab}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }

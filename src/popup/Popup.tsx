@@ -32,6 +32,7 @@ export default function Popup() {
     handleRenameGroup,
     handleDeleteGroup,
     handleOpenGroupTabs,
+    handleMoveSavedTab,
   } = useTabVaultPopup();
 
   const [newGroupName, setNewGroupName] = useState('');
@@ -142,14 +143,24 @@ export default function Popup() {
                   <Button variant="secondary" onClick={handleOpenAllTabs} disabled={isBusy}>
                     {busy.type === 'opening-all' ? 'Opening…' : 'Open All'}
                   </Button>
+                  {isSearching && (
+                    // Reordering/moving is disabled while a search filter is
+                    // active: some of a group's tabs are hidden from view, so
+                    // there's no unambiguous way to map a position in the
+                    // visible subset back onto the true, full order without
+                    // risking silently scrambling it.
+                    <p className="px-1 text-xs text-slate-400">Clear the search to reorder or move tabs.</p>
+                  )}
                   <div className="flex flex-col gap-3">
                     {groupsToShow.map((group) => (
                       <GroupSection
                         key={group.id}
                         group={group}
                         tabs={filteredSavedTabs.filter((tab) => tab.groupId === group.id)}
+                        allGroups={groups}
                         isDefault={group.id === DEFAULT_GROUP_ID}
                         disabled={isBusy}
+                        reorderingDisabled={isSearching}
                         isOpeningAll={busy.type === 'opening-group' && busy.groupId === group.id}
                         isDeletingGroup={busy.type === 'deleting-group' && busy.groupId === group.id}
                         openingTabId={busy.type === 'opening' ? busy.tabId : null}
@@ -159,6 +170,7 @@ export default function Popup() {
                         onOpenAll={() => handleOpenGroupTabs(group)}
                         onOpenTab={handleOpenTab}
                         onDeleteTab={handleDeleteTab}
+                        onMoveTab={handleMoveSavedTab}
                         searchTerms={searchTerms}
                       />
                     ))}

@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  computeReorderedSavedTabs,
   createGroup,
   deleteGroup,
   deleteSavedTab,
+  isSameSavedTabsOrder,
   listGroups,
   listSavedTabs,
   openAllSavedTabs,
   openGroupTabs,
   openSavedTab,
+  persistSavedTabsOrder,
   renameGroup,
   saveAllTabs,
   saveCurrentTab,
@@ -26,7 +29,8 @@ type BusyState =
   | { type: 'creating-group' }
   | { type: 'renaming-group'; groupId: string }
   | { type: 'deleting-group'; groupId: string }
-  | { type: 'opening-group'; groupId: string };
+  | { type: 'opening-group'; groupId: string }
+  | { type: 'reordering' };
 
 const NOTIFICATION_DURATION_MS: Record<Notification['type'], number> = {
   success: 2000,
@@ -95,6 +99,33 @@ export function useTabVaultPopup() {
       busyRef.current = false;
       setBusy({ type: 'idle' });
     }
+  };
+
+  // Reordering is optimistic, unlike every other action here: the new order
+  // is applied to `savedTabs` immediately (no storage read needed first —
+  // see requirement to avoid unnecessary reloads), then persisted in the
+  // background. If persistence fails, the pre-move snapshot is restored
+  // exactly, so the UI can never end up showing an order that isn't what's
+  // actually in storage, and no tab or group membership is ever lost.
+  const handleMoveSavedTab = async (tabId: string, targetGroupId: string, targetIndexInGroup: number) => {
+    if (busyRef.current) return;
+
+    const previousTabs = savedTabs;
+    const nextTabs = computeReorderedSavedTabs(previousTabs, tabId, targetGroupId, targetIndexInGroup);
+    if (isSameSavedTabsOrder(nextTabs, previousTabs)) return;
+
+    busyRef.current = true;
+    setBusy({ type: 'reordering' });
+    setSavedTabs(nextTabs);
+
+    const result = await persistSavedTabsOrder(nextTabs);
+    if (result.status === 'error') {
+      setSavedTabs(previousTabs);
+      setNotification({ type: 'error', message: result.message });
+    }
+
+    busyRef.current = false;
+    setBusy({ type: 'idle' });
   };
 
   const handleSaveCurrentTab = () =>
@@ -277,5 +308,6 @@ export function useTabVaultPopup() {
     handleRenameGroup,
     handleDeleteGroup,
     handleOpenGroupTabs,
+    handleMoveSavedTab,
   };
 }
