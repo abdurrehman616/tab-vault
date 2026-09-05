@@ -39,39 +39,6 @@ export async function getSavedTabs(): Promise<SavedTab[]> {
   }
 }
 
-/**
- * Persists the given list of saved tabs, replacing whatever was stored
- * before.
- */
-export async function saveSavedTabs(tabs: SavedTab[]): Promise<void> {
-  try {
-    await writeSavedTabs(tabs);
-  } catch (error) {
-    throw new StorageError('saveSavedTabs', error);
-  }
-}
-
-/** Removes a single saved tab by id, e.g. once it has been successfully reopened. */
-export async function removeSavedTab(id: string): Promise<void> {
-  try {
-    const tabs = await readSavedTabs();
-    await writeSavedTabs(tabs.filter((tab) => tab.id !== id));
-  } catch (error) {
-    throw new StorageError('removeSavedTab', error);
-  }
-}
-
-/** Reassigns every tab in one group to another group, in a single write. */
-export async function reassignTabsGroup(fromGroupId: string, toGroupId: string): Promise<void> {
-  try {
-    const tabs = await readSavedTabs();
-    const updated = tabs.map((tab) => (tab.groupId === fromGroupId ? { ...tab, groupId: toGroupId } : tab));
-    await writeSavedTabs(updated);
-  } catch (error) {
-    throw new StorageError('reassignTabsGroup', error);
-  }
-}
-
 // `chrome.storage.local` has no compare-and-swap or transaction primitive:
 // there is no way to say "write this, but only if nothing else has written
 // since I last read." A handful of retries is enough to make the optimistic
@@ -120,4 +87,31 @@ export async function updateSavedTabs(updater: (current: SavedTab[]) => SavedTab
   } catch (error) {
     throw new StorageError('updateSavedTabs', error);
   }
+}
+
+/**
+ * Removes a single saved tab by id, e.g. once it has been successfully
+ * reopened. Built on `updateSavedTabs` for the same reason every other
+ * mutation here is: without it, a delete racing a concurrent save/reorder
+ * from another popup could silently be undone (or undo the other change) via
+ * a stale full-array write.
+ */
+export async function removeSavedTab(id: string): Promise<void> {
+  await updateSavedTabs((current) => {
+    const next = current.filter((tab) => tab.id !== id);
+    return next.length === current.length ? current : next;
+  });
+}
+
+/** Reassigns every tab in one group to another group, in a single write. */
+export async function reassignTabsGroup(fromGroupId: string, toGroupId: string): Promise<void> {
+  await updateSavedTabs((current) => {
+    let changed = false;
+    const next = current.map((tab) => {
+      if (tab.groupId !== fromGroupId) return tab;
+      changed = true;
+      return { ...tab, groupId: toGroupId };
+    });
+    return changed ? next : current;
+  });
 }
