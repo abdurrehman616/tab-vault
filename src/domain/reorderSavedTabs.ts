@@ -1,4 +1,3 @@
-import { saveSavedTabs } from '../services/storage';
 import type { SavedTab } from '../types';
 
 /** Pass as `targetIndexInGroup` to mean "the end of the target group's list". */
@@ -61,16 +60,4 @@ export function isSameSavedTabsOrder(a: SavedTab[], b: SavedTab[]): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
   return a.every((tab, index) => tab === b[index]);
-}
-
-export type PersistSavedTabsOrderResult = { status: 'saved' } | { status: 'error'; message: string };
-
-/** Persists an already-computed reordering (see `computeReorderedSavedTabs`). */
-export async function persistSavedTabsOrder(tabs: SavedTab[]): Promise<PersistSavedTabsOrderResult> {
-  try {
-    await saveSavedTabs(tabs);
-  } catch {
-    return { status: 'error', message: "Couldn't save the new order." };
-  }
-  return { status: 'saved' };
 }

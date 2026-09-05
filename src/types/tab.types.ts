@@ -14,4 +14,6 @@ export interface SavedTab {
   savedAt: number;
   /** ID of the TabGroup this tab belongs to. Always set — falls back to the default group. */
   groupId: string;
+  /** Whether the user has marked this tab as a favorite. Always set — falls back to false. */
+  isFavorite: boolean;
 }

@@ -5,12 +5,13 @@ import type { SavedTab, TabGroup } from '../types';
 import { HighlightedText } from './HighlightedText';
 import { IconButton } from './IconButton';
 import { SmallButton } from './SmallButton';
-import { ChevronDownIcon, ChevronUpIcon, TrashIcon, VaultIcon } from './icons';
+import { ChevronDownIcon, ChevronUpIcon, StarFilledIcon, StarIcon, TrashIcon, VaultIcon } from './icons';
 
 type SavedTabRowProps = {
   tab: SavedTab;
   onOpen: () => void;
   onDelete: () => void;
+  onToggleFavorite: () => void;
   disabled: boolean;
   isOpening: boolean;
   isDeleting: boolean;
@@ -30,6 +31,7 @@ export function SavedTabRow({
   tab,
   onOpen,
   onDelete,
+  onToggleFavorite,
   disabled,
   isOpening,
   isDeleting,
@@ -79,6 +81,17 @@ export function SavedTabRow({
       }`}
     >
       <div className="flex items-center gap-2">
+        <IconButton
+          label={tab.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+          onClick={onToggleFavorite}
+          disabled={disabled}
+        >
+          {tab.isFavorite ? (
+            <StarFilledIcon className="size-4 text-amber-400" />
+          ) : (
+            <StarIcon className="size-4" />
+          )}
+        </IconButton>
         {tab.faviconUrl ? (
           <img src={tab.faviconUrl} alt="" className="size-4 shrink-0 rounded-sm" />
         ) : (

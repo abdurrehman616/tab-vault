@@ -7,4 +7,4 @@ export { SavedTabRow } from './SavedTabRow';
 export { GroupSection } from './GroupSection';
 export { SearchInput } from './SearchInput';
 export { HighlightedText } from './HighlightedText';
-export { VaultIcon, SettingsIcon, InboxIcon, TrashIcon, SearchIcon, ChevronUpIcon, ChevronDownIcon } from './icons';
+export { VaultIcon, SettingsIcon, InboxIcon, TrashIcon, SearchIcon, ChevronUpIcon, ChevronDownIcon, StarIcon, StarFilledIcon } from './icons';

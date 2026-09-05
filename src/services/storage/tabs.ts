@@ -6,9 +6,13 @@ async function readSavedTabs(): Promise<SavedTab[]> {
   const result = await chrome.storage.local.get(STORAGE_KEYS.tabs);
   const tabs = result[STORAGE_KEYS.tabs];
   if (!Array.isArray(tabs)) return [];
-  // Tabs saved before groups existed have no groupId; treat them as
-  // belonging to the default group rather than migrating storage.
-  return (tabs as SavedTab[]).map((tab) => ({ ...tab, groupId: tab.groupId ?? DEFAULT_GROUP_ID }));
+  // Tabs saved before groups/favorites existed are missing these fields;
+  // default them on read rather than migrating storage.
+  return (tabs as SavedTab[]).map((tab) => ({
+    ...tab,
+    groupId: tab.groupId ?? DEFAULT_GROUP_ID,
+    isFavorite: tab.isFavorite ?? false,
+  }));
 }
 
 async function writeSavedTabs(tabs: SavedTab[]): Promise<void> {

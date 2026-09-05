@@ -23,6 +23,7 @@ function toSavedTab(browserTab: BrowserTab): SavedTab {
     index: browserTab.index,
     savedAt: Date.now(),
     groupId: DEFAULT_GROUP_ID,
+    isFavorite: false,
   };
 }
 

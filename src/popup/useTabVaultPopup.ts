@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   computeReorderedSavedTabs,
+  computeToggledFavorite,
   createGroup,
   deleteGroup,
   deleteSavedTab,
@@ -10,7 +11,7 @@ import {
   openAllSavedTabs,
   openGroupTabs,
   openSavedTab,
-  persistSavedTabsOrder,
+  persistSavedTabs,
   renameGroup,
   saveAllTabs,
   saveCurrentTab,
@@ -30,7 +31,8 @@ type BusyState =
   | { type: 'renaming-group'; groupId: string }
   | { type: 'deleting-group'; groupId: string }
   | { type: 'opening-group'; groupId: string }
-  | { type: 'reordering' };
+  | { type: 'reordering' }
+  | { type: 'toggling-favorite' };
 
 const NOTIFICATION_DURATION_MS: Record<Notification['type'], number> = {
   success: 2000,
@@ -118,7 +120,32 @@ export function useTabVaultPopup() {
     setBusy({ type: 'reordering' });
     setSavedTabs(nextTabs);
 
-    const result = await persistSavedTabsOrder(nextTabs);
+    const result = await persistSavedTabs(nextTabs);
+    if (result.status === 'error') {
+      setSavedTabs(previousTabs);
+      setNotification({ type: 'error', message: result.message });
+    }
+
+    busyRef.current = false;
+    setBusy({ type: 'idle' });
+  };
+
+  // Same optimistic-then-persist-then-rollback-on-failure shape as
+  // handleMoveSavedTab, for the same reason: this is a quick, fully
+  // reversible, storage-only change with no Chrome tab involved, so instant
+  // visual feedback matters more than waiting for a round-trip confirm.
+  const handleToggleFavorite = async (tab: SavedTab) => {
+    if (busyRef.current) return;
+
+    const previousTabs = savedTabs;
+    const nextTabs = computeToggledFavorite(previousTabs, tab.id);
+    if (nextTabs === previousTabs) return;
+
+    busyRef.current = true;
+    setBusy({ type: 'toggling-favorite' });
+    setSavedTabs(nextTabs);
+
+    const result = await persistSavedTabs(nextTabs);
     if (result.status === 'error') {
       setSavedTabs(previousTabs);
       setNotification({ type: 'error', message: result.message });
@@ -309,5 +336,6 @@ export function useTabVaultPopup() {
     handleDeleteGroup,
     handleOpenGroupTabs,
     handleMoveSavedTab,
+    handleToggleFavorite,
   };
 }

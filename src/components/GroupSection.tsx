@@ -23,6 +23,7 @@ type GroupSectionProps = {
   onOpenAll: () => void;
   onOpenTab: (tab: SavedTab) => void;
   onDeleteTab: (tab: SavedTab) => void;
+  onToggleFavorite: (tab: SavedTab) => void;
   onMoveTab: (tabId: string, targetGroupId: string, targetIndexInGroup: number) => void;
   searchTerms: string[];
 };
@@ -43,6 +44,7 @@ export function GroupSection({
   onOpenAll,
   onOpenTab,
   onDeleteTab,
+  onToggleFavorite,
   onMoveTab,
   searchTerms,
 }: GroupSectionProps) {
@@ -156,6 +158,7 @@ export function GroupSection({
                 tab={tab}
                 onOpen={() => onOpenTab(tab)}
                 onDelete={() => onDeleteTab(tab)}
+                onToggleFavorite={() => onToggleFavorite(tab)}
                 disabled={disabled}
                 isOpening={openingTabId === tab.id}
                 isDeleting={deletingTabId === tab.id}
