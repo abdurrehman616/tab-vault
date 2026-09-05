@@ -9,6 +9,7 @@ export type { OpenAllSavedTabsResult } from './openAllSavedTabs';
 export { openGroupTabs } from './openGroupTabs';
 export type { OpenGroupTabsResult } from './openGroupTabs';
 export { listSavedTabs } from './listSavedTabs';
+export { searchSavedTabs, normalizeSearchQuery } from './searchSavedTabs';
 export { deleteSavedTab } from './deleteSavedTab';
 export type { DeleteSavedTabResult } from './deleteSavedTab';
 export { listGroups } from './listGroups';

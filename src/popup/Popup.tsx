@@ -1,6 +1,17 @@
-import { useState } from 'react';
-import { Button, EmptyState, GroupSection, IconButton, InboxIcon, SettingsIcon, SmallButton, Toast, VaultIcon } from '../components';
-import { DEFAULT_GROUP_ID } from '../domain';
+import { useMemo, useState } from 'react';
+import {
+  Button,
+  EmptyState,
+  GroupSection,
+  IconButton,
+  InboxIcon,
+  SearchIcon,
+  SettingsIcon,
+  SmallButton,
+  Toast,
+  VaultIcon,
+} from '../components';
+import { DEFAULT_GROUP_ID, normalizeSearchQuery, searchSavedTabs } from '../domain';
 import { useTabVaultPopup } from './useTabVaultPopup';
 
 export default function Popup() {
@@ -23,7 +34,14 @@ export default function Popup() {
   } = useTabVaultPopup();
 
   const [newGroupName, setNewGroupName] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const hasAnyContent = savedTabs.length > 0 || groups.length > 1;
+
+  const isSearching = normalizeSearchQuery(searchQuery).length > 0;
+  const filteredSavedTabs = useMemo(() => searchSavedTabs(savedTabs, searchQuery), [savedTabs, searchQuery]);
+  const groupsToShow = isSearching
+    ? groups.filter((group) => filteredSavedTabs.some((tab) => tab.groupId === group.id))
+    : groups;
 
   const submitNewGroup = () => {
     const trimmed = newGroupName.trim();
@@ -82,29 +100,57 @@ export default function Popup() {
             />
           ) : (
             <>
-              <Button variant="secondary" onClick={handleOpenAllTabs} disabled={isBusy}>
-                {busy.type === 'opening-all' ? 'Opening…' : 'Open All'}
-              </Button>
-              <div className="flex max-h-72 flex-col gap-3 overflow-y-auto">
-                {groups.map((group) => (
-                  <GroupSection
-                    key={group.id}
-                    group={group}
-                    tabs={savedTabs.filter((tab) => tab.groupId === group.id)}
-                    isDefault={group.id === DEFAULT_GROUP_ID}
-                    disabled={isBusy}
-                    isOpeningAll={busy.type === 'opening-group' && busy.groupId === group.id}
-                    isDeletingGroup={busy.type === 'deleting-group' && busy.groupId === group.id}
-                    openingTabId={busy.type === 'opening' ? busy.tabId : null}
-                    deletingTabId={busy.type === 'deleting' ? busy.tabId : null}
-                    onRename={(name) => handleRenameGroup(group, name)}
-                    onDelete={() => handleDeleteGroup(group)}
-                    onOpenAll={() => handleOpenGroupTabs(group)}
-                    onOpenTab={handleOpenTab}
-                    onDeleteTab={handleDeleteTab}
-                  />
-                ))}
-              </div>
+              <label className="relative flex items-center">
+                <span className="sr-only">Search saved tabs</span>
+                <SearchIcon className="pointer-events-none absolute left-2 size-4 text-slate-400" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search saved tabs..."
+                  className="w-full rounded-md border border-slate-200 py-1.5 pr-3 pl-8 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                />
+              </label>
+
+              {isSearching && (
+                <p className="px-1 text-xs text-slate-400">
+                  {filteredSavedTabs.length} matching tab{filteredSavedTabs.length === 1 ? '' : 's'}
+                </p>
+              )}
+
+              {isSearching && filteredSavedTabs.length === 0 ? (
+                <EmptyState
+                  icon={<SearchIcon className="size-6" />}
+                  title="No matching tabs"
+                  description="Try a different search term."
+                />
+              ) : (
+                <>
+                  <Button variant="secondary" onClick={handleOpenAllTabs} disabled={isBusy}>
+                    {busy.type === 'opening-all' ? 'Opening…' : 'Open All'}
+                  </Button>
+                  <div className="flex max-h-72 flex-col gap-3 overflow-y-auto">
+                    {groupsToShow.map((group) => (
+                      <GroupSection
+                        key={group.id}
+                        group={group}
+                        tabs={filteredSavedTabs.filter((tab) => tab.groupId === group.id)}
+                        isDefault={group.id === DEFAULT_GROUP_ID}
+                        disabled={isBusy}
+                        isOpeningAll={busy.type === 'opening-group' && busy.groupId === group.id}
+                        isDeletingGroup={busy.type === 'deleting-group' && busy.groupId === group.id}
+                        openingTabId={busy.type === 'opening' ? busy.tabId : null}
+                        deletingTabId={busy.type === 'deleting' ? busy.tabId : null}
+                        onRename={(name) => handleRenameGroup(group, name)}
+                        onDelete={() => handleDeleteGroup(group)}
+                        onOpenAll={() => handleOpenGroupTabs(group)}
+                        onOpenTab={handleOpenTab}
+                        onDeleteTab={handleDeleteTab}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
