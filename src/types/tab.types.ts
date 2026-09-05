@@ -14,4 +14,12 @@ export interface SavedTab {
   savedAt: number;
   /** ID of the TabGroup this tab belongs to. Always set — falls back to the default group. */
   groupId: string;
+  /** Whether the user has marked this tab as a favorite. Always set — falls back to false. */
+  isFavorite: boolean;
+  /**
+   * References a `ChromeTabGroupInfo.id` if this tab was part of a Chrome
+   * Tab Group at save time. Absent if it wasn't, or if that group's
+   * metadata couldn't be read. Never Chrome's own (ephemeral) group id.
+   */
+  chromeGroupKey?: string;
 }

@@ -10,5 +10,5 @@
     "service_worker": "src/background/index.ts",
     "type": "module"
   },
-  "permissions": ["tabs", "storage"]
+  "permissions": ["tabs", "storage", "tabGroups"]
 }

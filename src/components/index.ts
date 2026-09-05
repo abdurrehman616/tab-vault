@@ -5,4 +5,6 @@ export { EmptyState } from './EmptyState';
 export { Toast } from './Toast';
 export { SavedTabRow } from './SavedTabRow';
 export { GroupSection } from './GroupSection';
-export { VaultIcon, SettingsIcon, InboxIcon, TrashIcon } from './icons';
+export { SearchInput } from './SearchInput';
+export { HighlightedText } from './HighlightedText';
+export { VaultIcon, SettingsIcon, InboxIcon, TrashIcon, SearchIcon, StarIcon, StarFilledIcon } from './icons';

@@ -3,7 +3,13 @@ import type { SavedTab } from '../types';
 import { openTabsInOrder } from './openTabsInOrder';
 
 export type OpenAllSavedTabsResult =
-  | { status: 'opened'; openedCount: number; failedCount: number }
+  | {
+      status: 'opened';
+      openedCount: number;
+      failedCount: number;
+      groupsRecreatedCount: number;
+      groupsFailedCount: number;
+    }
   | { status: 'nothing-to-open' }
   | { status: 'error'; message: string };
 
@@ -20,6 +26,6 @@ export async function openAllSavedTabs(): Promise<OpenAllSavedTabsResult> {
     return { status: 'nothing-to-open' };
   }
 
-  const { openedCount, failedCount } = await openTabsInOrder(tabs);
-  return { status: 'opened', openedCount, failedCount };
+  const { openedCount, failedCount, groupsRecreatedCount, groupsFailedCount } = await openTabsInOrder(tabs);
+  return { status: 'opened', openedCount, failedCount, groupsRecreatedCount, groupsFailedCount };
 }

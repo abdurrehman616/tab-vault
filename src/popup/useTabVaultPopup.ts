@@ -1,17 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  computeReorderedSavedTabs,
+  computeToggledFavorite,
   createGroup,
   deleteGroup,
   deleteSavedTab,
+  isSameSavedTabsOrder,
   listGroups,
   listSavedTabs,
   openAllSavedTabs,
   openGroupTabs,
   openSavedTab,
+  persistSavedTabs,
   renameGroup,
   saveAllTabs,
+  saveAllWindowsTabs,
   saveCurrentTab,
 } from '../domain';
+import { normalizeSavedTabs, STORAGE_KEYS } from '../services/storage';
 import type { SavedTab, TabGroup } from '../types';
 
 type Notification = { type: 'success' | 'error' | 'info'; message: string };
@@ -20,13 +26,16 @@ type BusyState =
   | { type: 'idle' }
   | { type: 'saving-current' }
   | { type: 'saving-all' }
+  | { type: 'saving-all-windows' }
   | { type: 'opening'; tabId: string }
   | { type: 'opening-all' }
   | { type: 'deleting'; tabId: string }
   | { type: 'creating-group' }
   | { type: 'renaming-group'; groupId: string }
   | { type: 'deleting-group'; groupId: string }
-  | { type: 'opening-group'; groupId: string };
+  | { type: 'opening-group'; groupId: string }
+  | { type: 'reordering' }
+  | { type: 'toggling-favorite' };
 
 const NOTIFICATION_DURATION_MS: Record<Notification['type'], number> = {
   success: 2000,
@@ -36,6 +45,39 @@ const NOTIFICATION_DURATION_MS: Record<Notification['type'], number> = {
 
 function pluralTabs(count: number): string {
   return count === 1 ? 'tab' : 'tabs';
+}
+
+function pluralGroups(count: number): string {
+  return count === 1 ? 'group' : 'groups';
+}
+
+/**
+ * Builds the notification for any "opened N tabs" outcome, folding in
+ * Chrome Tab Group recreation results (see `openTabsInOrder`/
+ * `recreateChromeGroups`) alongside the existing open/fail counts.
+ */
+function buildOpenNotification(result: {
+  openedCount: number;
+  failedCount: number;
+  groupsRecreatedCount: number;
+  groupsFailedCount: number;
+}): Notification {
+  const parts = [
+    result.failedCount > 0
+      ? `${result.openedCount} ${pluralTabs(result.openedCount)} opened — ${result.failedCount} couldn't open`
+      : `${result.openedCount} ${pluralTabs(result.openedCount)} opened`,
+  ];
+  if (result.groupsRecreatedCount > 0) {
+    parts.push(`${result.groupsRecreatedCount} ${pluralGroups(result.groupsRecreatedCount)} restored`);
+  }
+  if (result.groupsFailedCount > 0) {
+    parts.push(`${result.groupsFailedCount} ${pluralGroups(result.groupsFailedCount)} couldn't be restored`);
+  }
+
+  return {
+    type: result.failedCount > 0 || result.groupsFailedCount > 0 ? 'error' : 'success',
+    message: parts.join(' · '),
+  };
 }
 
 export function useTabVaultPopup() {
@@ -68,6 +110,36 @@ export function useTabVaultPopup() {
     return () => clearTimeout(timer);
   }, [notification]);
 
+  // Keeps this popup instance in sync with any *other* TabVault context
+  // (another popup window, if Chrome allows more than one open at once)
+  // that changes storage. `chrome.storage.onChanged` fires for every write
+  // to `chrome.storage.local`, including this instance's own — mirroring
+  // its `newValue` directly is the simplest reliable way to stay in sync
+  // without a second read round-trip. This is deliberately simple (no
+  // merge logic here): correctness against concurrent writes is already
+  // guaranteed at the storage layer (see `updateSavedTabs`), so this effect
+  // only has to solve "stale UI", not data safety.
+  //
+  // A rare cosmetic side effect: if this popup has an optimistic update
+  // in flight (reorder/favorite-toggle) when another context's unrelated
+  // write arrives, that write's `newValue` will briefly replace the
+  // optimistic view until this instance's own write resolves and
+  // reconciles again a moment later. No data is at risk either way.
+  useEffect(() => {
+    function handleStorageChanged(changes: Record<string, chrome.storage.StorageChange>, areaName: string) {
+      if (areaName !== 'local') return;
+      if (STORAGE_KEYS.tabs in changes) {
+        setSavedTabs(normalizeSavedTabs(changes[STORAGE_KEYS.tabs].newValue));
+      }
+      if (STORAGE_KEYS.groups in changes) {
+        const groups = changes[STORAGE_KEYS.groups].newValue;
+        setGroups(Array.isArray(groups) ? (groups as TabGroup[]) : []);
+      }
+    }
+    chrome.storage.onChanged.addListener(handleStorageChanged);
+    return () => chrome.storage.onChanged.removeListener(handleStorageChanged);
+  }, []);
+
   const isBusy = busy.type !== 'idle';
 
   const refreshTabs = () => listSavedTabs().then(setSavedTabs);
@@ -97,6 +169,69 @@ export function useTabVaultPopup() {
     }
   };
 
+  // Reordering is optimistic, unlike every other action here: the new order
+  // is applied to `savedTabs` immediately (no storage read needed first —
+  // see requirement to avoid unnecessary reloads), then persisted in the
+  // background. If persistence fails, the pre-move snapshot is restored
+  // exactly, so the UI can never end up showing an order that isn't what's
+  // actually in storage, and no tab or group membership is ever lost.
+  const handleMoveSavedTab = async (tabId: string, targetGroupId: string, targetIndexInGroup: number) => {
+    if (busyRef.current) return;
+
+    const previousTabs = savedTabs;
+    const nextTabs = computeReorderedSavedTabs(previousTabs, tabId, targetGroupId, targetIndexInGroup);
+    if (isSameSavedTabsOrder(nextTabs, previousTabs)) return;
+
+    busyRef.current = true;
+    setBusy({ type: 'reordering' });
+    setSavedTabs(nextTabs);
+
+    // The optimistic `nextTabs` above is only for instant visual feedback.
+    // What's actually persisted is computed by re-running the same reorder
+    // against storage's current state at write time (see `persistSavedTabs`),
+    // so a concurrent change from another popup (e.g. it deleted this exact
+    // tab) can't be silently undone by writing back this stale snapshot.
+    const result = await persistSavedTabs((current) =>
+      computeReorderedSavedTabs(current, tabId, targetGroupId, targetIndexInGroup),
+    );
+    if (result.status === 'error') {
+      setSavedTabs(previousTabs);
+      setNotification({ type: 'error', message: result.message });
+    } else {
+      setSavedTabs(result.tabs);
+    }
+
+    busyRef.current = false;
+    setBusy({ type: 'idle' });
+  };
+
+  // Same optimistic-then-persist-then-rollback-on-failure shape as
+  // handleMoveSavedTab, for the same reason: this is a quick, fully
+  // reversible, storage-only change with no Chrome tab involved, so instant
+  // visual feedback matters more than waiting for a round-trip confirm.
+  const handleToggleFavorite = async (tab: SavedTab) => {
+    if (busyRef.current) return;
+
+    const previousTabs = savedTabs;
+    const nextTabs = computeToggledFavorite(previousTabs, tab.id);
+    if (nextTabs === previousTabs) return;
+
+    busyRef.current = true;
+    setBusy({ type: 'toggling-favorite' });
+    setSavedTabs(nextTabs);
+
+    const result = await persistSavedTabs((current) => computeToggledFavorite(current, tab.id));
+    if (result.status === 'error') {
+      setSavedTabs(previousTabs);
+      setNotification({ type: 'error', message: result.message });
+    } else {
+      setSavedTabs(result.tabs);
+    }
+
+    busyRef.current = false;
+    setBusy({ type: 'idle' });
+  };
+
   const handleSaveCurrentTab = () =>
     runExclusive({ type: 'saving-current' }, async () => {
       const result = await saveCurrentTab();
@@ -120,6 +255,29 @@ export function useTabVaultPopup() {
   const handleSaveAllTabs = () =>
     runExclusive({ type: 'saving-all' }, async () => {
       const result = await saveAllTabs();
+      switch (result.status) {
+        case 'saved': {
+          await refreshTabs();
+          const leftOpen = result.skippedDuplicateCount + result.unclosedCount;
+          const message =
+            leftOpen > 0
+              ? `${result.savedCount} ${pluralTabs(result.savedCount)} saved — ${leftOpen} left open`
+              : `${result.savedCount} ${pluralTabs(result.savedCount)} saved`;
+          setNotification({ type: 'success', message });
+          break;
+        }
+        case 'nothing-to-save':
+          setNotification({ type: 'info', message: 'No new tabs to save.' });
+          break;
+        case 'error':
+          setNotification({ type: 'error', message: result.message });
+          break;
+      }
+    });
+
+  const handleSaveAllWindowsTabs = () =>
+    runExclusive({ type: 'saving-all-windows' }, async () => {
+      const result = await saveAllWindowsTabs();
       switch (result.status) {
         case 'saved': {
           await refreshTabs();
@@ -166,15 +324,10 @@ export function useTabVaultPopup() {
     runExclusive({ type: 'opening-all' }, async () => {
       const result = await openAllSavedTabs();
       switch (result.status) {
-        case 'opened': {
+        case 'opened':
           await refreshTabs();
-          const message =
-            result.failedCount > 0
-              ? `${result.openedCount} ${pluralTabs(result.openedCount)} opened — ${result.failedCount} couldn't open`
-              : `${result.openedCount} ${pluralTabs(result.openedCount)} opened`;
-          setNotification({ type: result.failedCount > 0 ? 'error' : 'success', message });
+          setNotification(buildOpenNotification(result));
           break;
-        }
         case 'nothing-to-open':
           setNotification({ type: 'info', message: 'No saved tabs to open.' });
           break;
@@ -243,15 +396,10 @@ export function useTabVaultPopup() {
     runExclusive({ type: 'opening-group', groupId: group.id }, async () => {
       const result = await openGroupTabs(group.id);
       switch (result.status) {
-        case 'opened': {
+        case 'opened':
           await refreshTabs();
-          const message =
-            result.failedCount > 0
-              ? `${result.openedCount} ${pluralTabs(result.openedCount)} opened — ${result.failedCount} couldn't open`
-              : `${result.openedCount} ${pluralTabs(result.openedCount)} opened`;
-          setNotification({ type: result.failedCount > 0 ? 'error' : 'success', message });
+          setNotification(buildOpenNotification(result));
           break;
-        }
         case 'nothing-to-open':
           setNotification({ type: 'info', message: 'No tabs in this group.' });
           break;
@@ -270,6 +418,7 @@ export function useTabVaultPopup() {
     notification,
     handleSaveCurrentTab,
     handleSaveAllTabs,
+    handleSaveAllWindowsTabs,
     handleOpenTab,
     handleDeleteTab,
     handleOpenAllTabs,
@@ -277,5 +426,7 @@ export function useTabVaultPopup() {
     handleRenameGroup,
     handleDeleteGroup,
     handleOpenGroupTabs,
+    handleMoveSavedTab,
+    handleToggleFavorite,
   };
 }

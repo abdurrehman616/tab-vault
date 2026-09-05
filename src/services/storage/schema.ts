@@ -7,6 +7,7 @@
 export const STORAGE_KEYS = {
   tabs: 'tabvault.tabs',
   groups: 'tabvault.groups',
+  chromeGroups: 'tabvault.chromeGroups',
   session: 'tabvault.session',
 } as const;
 
